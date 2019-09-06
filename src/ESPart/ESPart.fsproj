@@ -9,8 +9,8 @@
     <Compile Include="Configuration.fs" />
     <Compile Include="Part.fs" />
     <Compile Include="ESPart.fs" />
-    <Compile Include="Logger.fs" />
     <Compile Include="ESApp.fs" />
+    <Compile Include="Logger.fs" />
   </ItemGroup>
 
 </Project>
