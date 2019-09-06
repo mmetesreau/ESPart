@@ -64,20 +64,31 @@ module Message =
         | None -> 
             [ MessageQuacked { MessageId = messageId; AuthorId = command.AuthorId; Content = command.Content } ]
                 |> Seq.ofList
-        | _ -> Seq.empty
+                |> Ok
+        | _ -> Error "Message already exist"
 
     let requack (messageId : MessageId, command : Requack) (state : State option) =
         match state with
-        | Some message when message.AuthorId = command.RequackerId -> Seq.empty
-        | Some message when message.Requackers |> List.exists ((=) command.RequackerId) -> Seq.empty
+        | Some message when message.AuthorId = command.RequackerId -> 
+            Error "The author can't requack this own message"
+        | Some message when message.Requackers |> List.exists ((=) command.RequackerId) -> 
+            Error "The message has already been requacked by the user"
         | Some _  -> 
             [ MessageRequacked { MessageId = messageId; RequackerId = command.RequackerId } ]
                 |> Seq.ofList
-        | _ -> Seq.empty 
+                |> Ok
+        | None -> 
+            Error "The message does not exist"
 
     let delete (messageId : MessageId, command : Delete) (state : State option) =
         match state with
-        | Some message when not message.Deleted && message.AuthorId = command.DeleterId -> 
+        | Some message when message.Deleted ->
+            Error "The message has already been deleted"
+        | Some message when message.AuthorId = command.DeleterId ->
+            Error "The message can already been deleted by its author"
+        | Some _ -> 
             [ MessageDeleted { MessageId = messageId; DeleterId = command.DeleterId } ]
                 |> Seq.ofList
-        | _ -> Seq.empty
+                |> Ok
+        | None -> 
+            Error "The message does not exist"

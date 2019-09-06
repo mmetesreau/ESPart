@@ -7,12 +7,12 @@ module ESPart =
     type ESContext = {
         request: Request option
         stream: Stream
-        response: Stream option
+        response: Result<Event seq, string> option
     }
 
     type Evolve<'state, 'event> = 'state option -> 'event -> 'state option
     
-    type CommandHandler<'command, 'state, 'event> = (AggregateId * 'command) -> 'state option -> 'event seq
+    type CommandHandler<'command, 'state, 'event> = (AggregateId * 'command) -> 'state option -> Result<'event seq, string>
     
     type EventHandler<'event> = 'event seq -> unit
 
@@ -34,7 +34,7 @@ module ESPart =
                                 |> Seq.map unbox<'event>
                                 |> Seq.fold evolve None
                                 |> commandHandler (aggregateId, command)
-                                |> Seq.map box                                
+                                |> Result.bind (fun events -> events |> Seq.map box |> Ok)
 
                 return Some { ctx with response = Some events }     
             | _ -> return None                                         
@@ -51,45 +51,10 @@ module ESPart =
 
     let events (eventHandler: EventHandler<'event>) (ctx: ESContext) = async {
         match ctx.response with
-        | Some events ->
+        | Some (Ok events) ->
             events 
                 |> Seq.map unbox<'event>
                 |> eventHandler 
             return Some ctx     
         | _ -> return None
     }
-    
-    let createConsoleLogger () =
-        let consoleHandler = 
-            MailboxProcessor<ESContext>.Start(fun inbox ->
-                let rec handler () = async {
-                    let! ctx = inbox.Receive()
-
-                    match ctx.request with 
-                    | Some command ->
-                        printfn "Log command: %A" command
-                    | _ -> 
-                        printfn "Log command: -"
-
-                    match ctx.response with
-                    | Some events ->
-                        if events |> Seq.isEmpty  then
-                            printfn "Log events: -"
-                        else
-                            events 
-                                |> Seq.iter (printfn "Log : %A")
-                    | _ ->      
-                        printfn "Log events: -"
-
-                    printfn "----------------"
-
-                    return! handler()
-                }
-
-                handler ())
-
-        fun (ctx: ESContext) -> async {
-            consoleHandler.Post ctx
-
-            return Some ctx
-        }

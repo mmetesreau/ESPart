@@ -24,13 +24,13 @@ module ESApp =
                 match! run { ctx with request = Some (aggregateId, command) } esPart with
                 | Some newCtx ->
                     match newCtx.response with
-                    | Some events ->
+                    | Some (Ok events) ->
                         do! eventStore.Append aggregateId events
                         
                         let newStream = events |> Seq.append newCtx.stream
                         
                         return! commandLoop { newCtx with stream = newStream; response = None }              
-                    | None -> 
+                    | _ -> 
                         return! commandLoop { newCtx with response = None }              
                 | None ->
                     return! commandLoop { ctx with response = None }              
